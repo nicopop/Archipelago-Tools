@@ -4,6 +4,7 @@ from Generate import main as GenMain, read_weights_yamls
 from Main import main as ERmain
 from argparse import ArgumentParser, ArgumentTypeError, Namespace
 from BaseClasses import PlandoOptions
+from Options import ProgressionBalancing
 from typing import Tuple, Any, Dict
 
 def main(args: Namespace):
@@ -36,8 +37,7 @@ def main(args: Namespace):
 
     if args.max_prog_balancing == -1:
         root = meta_weights.get(None, {})
-        if root:
-            args.max_prog_balancing = get_prog_bal_int_value(get_choice("max_progression_balancing", root, 100))
+        args.max_prog_balancing = handle_meta_prog_bal_value(get_choice("max_progression_balancing", root, 99))
 
 # endregion weights.yaml + meta.yaml processing
 
@@ -49,37 +49,43 @@ def main(args: Namespace):
         for fname, sub_yaml in player_cache.items():
             for player_key, player in sub_yaml.items():
                 for key, root_option in player.items():
+                    if not isinstance(root_option, dict):
+                        continue
                     if key in [ "game", "description", "requires", "name"]:
                         continue
-                    prog_bal_value = get_choice("progression_balancing", root_option, None, True)
+                    max_prog = handle_meta_prog_bal_value(get_choice("max_progression_balancing", meta_weights.get(key, {}), args.max_prog_balancing))
+                    prog_bal_value: dict[Any, int]|int|str|None = get_choice("progression_balancing", root_option, None, True)
+
+                    if prog_bal_value is None:
+                        prog_bal_value = int(ProgressionBalancing.default)
+
                     if isinstance(prog_bal_value, dict):
                         for pb_key, weight in dict(prog_bal_value.items()).items():
                             if weight == 0:
                                 continue
-                            proccessed = process_prog_bal_value(pb_key)
+                            proccessed = process_prog_bal_value(pb_key, max_prog)
                             if proccessed is not None:
                                 del player_cache[fname][player_key][key]["progression_balancing"][pb_key]
                                 if proccessed not in player_cache[fname][player_key][key]["progression_balancing"].keys():
                                     player_cache[fname][player_key][key]["progression_balancing"][proccessed] = weight
-                            pass
+                                else:
+                                    player_cache[fname][player_key][key]["progression_balancing"][proccessed] += weight #combine the weight
                     else:
-                        proccessed = process_prog_bal_value(prog_bal_value)
+                        proccessed = process_prog_bal_value(prog_bal_value, max_prog)
                         if proccessed is not None:
                             player_cache[fname][player_key][key]["progression_balancing"] = proccessed
-                pass
-            pass
+
 # endregion prog_balancing adjustments
 
 # region Temp folder
-    yaml_path_dir = tempfile.mkdtemp(prefix="apgeneratebutlpb")
-    temp_yamls = player_cache
+    yaml_path_dir = tempfile.mkdtemp(prefix="apgenerate")
 
     if meta_weights and Path(player_path) in Path(args.meta_file_path).parents: # if its in the player folder
-        temp_yamls[Path(args.meta_file_path).name] = {0:meta_weights}
+        player_cache[Path(args.meta_file_path).name] = {0:meta_weights}
     if weights_file and Path(player_path) in Path(args.weights_file_path).parents: # if its in the player folder
-        temp_yamls[Path(args.weights_file_path).name] = {0:weights_file}
+        player_cache[Path(args.weights_file_path).name] = {0:weights_file}
 
-    for file, content in temp_yamls.items():
+    for file, content in player_cache.items():
         yaml_path = os.path.join(yaml_path_dir, file)
         with open(yaml_path, "w+", encoding="utf-8") as f:
             yaml.dump_all(list(content.values()), f, sort_keys=False)
@@ -128,18 +134,17 @@ def get_random_modifier(random: str) -> str:
     splits = random.split("-")
     return splits[1]
 
-def get_prog_bal_int_value(value) -> int|str:
+def get_prog_bal_int_value(value: int|str|None) -> int|str:
     if value is None:
-        return 100
+        return 99
+    elif isinstance(value, int):
+        return value
+
     try:
         intvalue = int(value)
     except ValueError:
-        if value == "disabled":
-            intvalue = 0
-        elif value == "normal":
-            intvalue = 50
-        elif value == "extreme":
-            intvalue = 99
+        if value in ProgressionBalancing.special_range_names.keys():
+            intvalue = ProgressionBalancing.special_range_names[value]
         elif value.startswith("random"):
             if value.startswith("random-range"):
                 intvalue = "range"
@@ -149,31 +154,38 @@ def get_prog_bal_int_value(value) -> int|str:
             raise Exception("how did I get here...")
     return intvalue
 
-def process_prog_bal_value(key) -> None|str|int:
+def handle_meta_prog_bal_value(value: str|int) -> int:
+    if isinstance(value, int) and 0 <= value <= 99:
+        return value
+    option = ProgressionBalancing.from_any(value)
+    return option.value
+
+
+def process_prog_bal_value(key: int|str, max_prog: int) -> None|str|int:
     processing = get_prog_bal_int_value(key)
-    if isinstance(processing, str):
+    if isinstance(processing, str) and isinstance(key, str):
         replacement = None
         if processing == "random":
             modifier = get_random_modifier(key)
-            replacement = f"random-range{'-' + modifier if modifier else ''}-0-{str(args.max_prog_balancing)}"
+            replacement = f"random-range{'-' + modifier if modifier else ''}-0-{str(max_prog)}"
         elif processing == "range":
             modified = False
             rangevalues = get_range_values(key)
             min_value = rangevalues[0]
             max_value = rangevalues[1]
             modifier = rangevalues[2]
-            if max_value > args.max_prog_balancing:
+            if max_value > max_prog:
                 modified = True
-                max_value = args.max_prog_balancing
-            if min_value > args.max_prog_balancing:
+                max_value = max_prog
+            if min_value > max_prog:
                 modified = True
-                min_value = args.max_prog_balancing
+                min_value = max_prog
             if modified:
                 replacement = f"random-range{'-' + modifier if modifier else ''}-{min_value}-{max_value}"
         return replacement
     elif isinstance(processing, int):
-        if processing > args.max_prog_balancing:
-            return args.max_prog_balancing
+        if processing > max_prog:
+            return max_prog
 
     return None
 
@@ -253,7 +265,7 @@ def mystery_argparse(): # Modified arguments From 0.6.0 Generate.py
                         help="List of options that can be set manually. Can be combined, for example \"bosses, items\"")
     parser.add_argument("--skip_prog_balancing", action="store_true",
                         help="Skip progression balancing step during generation.")
-    parser.add_argument('--max_prog_balancing', type=int_range(-1,100), default=-1,
+    parser.add_argument('--max_prog_balancing', type=int_range(-1,99), default=-1,
                         help="Set the maximum level of progression balancing allowed, if set to any value other than -1") #Custom
     parser.add_argument("--skip_output", action="store_true",
                         help="Skips generation assertion and output stages and skips multidata and spoiler output. "
