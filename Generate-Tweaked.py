@@ -46,18 +46,22 @@ def main(args: Namespace):
 
 # region prog_balancing
     if int(args.max_prog_balancing) < 100:
-        for fname, sub_yaml in player_cache.items():
-            for player_key, player in sub_yaml.items():
-                for key, root_option in player.items():
-                    if not isinstance(root_option, dict):
+        for player, player_yaml in player_cache.items():
+            i = 0
+            for sub_yaml in player_yaml:
+                games = get_choice("game", sub_yaml, "Archipelago", True)
+                if isinstance(games, str):
+                    games = [games]
+                elif isinstance(games, dict):
+                    games = list(games.keys())
+                for option_key, option in sub_yaml.items():
+                    if option_key not in games:
                         continue
-                    if key in [ "game", "description", "requires", "name"]:
-                        continue
-                    max_prog = handle_meta_prog_bal_value(get_choice("max_progression_balancing", meta_weights.get(key, {}), args.max_prog_balancing))
-                    prog_bal_value: dict[Any, int]|int|str|None = get_choice("progression_balancing", root_option, None, True)
+                    max_prog = handle_meta_prog_bal_value(get_choice("max_progression_balancing", meta_weights.get(option_key, {}), args.max_prog_balancing))
+                    prog_bal_value: dict[Any, int]|int|str|None = get_choice("progression_balancing", option, None, True)
 
                     if prog_bal_value is None:
-                        prog_bal_value = int(ProgressionBalancing.default)
+                        prog_bal_value = handle_meta_prog_bal_value(ProgressionBalancing.default)
 
                     if isinstance(prog_bal_value, dict):
                         for pb_key, weight in dict(prog_bal_value.items()).items():
@@ -65,15 +69,16 @@ def main(args: Namespace):
                                 continue
                             proccessed = process_prog_bal_value(pb_key, max_prog)
                             if proccessed is not None:
-                                del player_cache[fname][player_key][key]["progression_balancing"][pb_key]
-                                if proccessed not in player_cache[fname][player_key][key]["progression_balancing"].keys():
-                                    player_cache[fname][player_key][key]["progression_balancing"][proccessed] = weight
+                                del player_cache[player][i][option_key]["progression_balancing"][pb_key]
+                                if proccessed not in player_cache[player][i][option_key]["progression_balancing"].keys():
+                                    player_cache[player][i][option_key]["progression_balancing"][proccessed] = weight
                                 else:
-                                    player_cache[fname][player_key][key]["progression_balancing"][proccessed] += weight #combine the weight
+                                    player_cache[player][i][option_key]["progression_balancing"][proccessed] += weight #combine the weight
                     else:
                         proccessed = process_prog_bal_value(prog_bal_value, max_prog)
                         if proccessed is not None:
-                            player_cache[fname][player_key][key]["progression_balancing"] = proccessed
+                            player_cache[player][i][option_key]["progression_balancing"] = proccessed
+                i += 1
 
 # endregion prog_balancing adjustments
 
@@ -81,14 +86,14 @@ def main(args: Namespace):
     yaml_path_dir = tempfile.mkdtemp(prefix="apgenerate")
 
     if meta_weights and Path(player_path) in Path(args.meta_file_path).parents: # if its in the player folder
-        player_cache[Path(args.meta_file_path).name] = {0:meta_weights}
+        player_cache[Path(args.meta_file_path).name] = [meta_weights]
     if weights_file and Path(player_path) in Path(args.weights_file_path).parents: # if its in the player folder
-        player_cache[Path(args.weights_file_path).name] = {0:weights_file}
+        player_cache[Path(args.weights_file_path).name] = [weights_file]
 
     for file, content in player_cache.items():
         yaml_path = os.path.join(yaml_path_dir, file)
         with open(yaml_path, "w+", encoding="utf-8") as f:
-            yaml.dump_all(list(content.values()), f, sort_keys=False)
+            yaml.dump_all(content, f, sort_keys=False)
 
     args.player_files_path = yaml_path_dir # Update Args path for generation
     args.meta_file_path = os.path.join(yaml_path_dir, Path(args.meta_file_path).name)
@@ -103,6 +108,12 @@ def main(args: Namespace):
 # endregion
 
 # region Misc functions
+def handle_meta_prog_bal_value(value: str|int) -> int:
+    if isinstance(value, int) and 0 <= value <= 99:
+        return value
+    option = ProgressionBalancing.from_any(value)
+    return option.value
+
 def get_choice(option, root, value=None, return_all = False) -> Any:
     if option not in root:
         return value
@@ -154,13 +165,6 @@ def get_prog_bal_int_value(value: int|str|None) -> int|str:
             raise Exception("how did I get here...")
     return intvalue
 
-def handle_meta_prog_bal_value(value: str|int) -> int:
-    if isinstance(value, int) and 0 <= value <= 99:
-        return value
-    option = ProgressionBalancing.from_any(value)
-    return option.value
-
-
 def process_prog_bal_value(key: int|str, max_prog: int) -> None|str|int:
     processing = get_prog_bal_int_value(key)
     if isinstance(processing, str) and isinstance(key, str):
@@ -188,11 +192,13 @@ def process_prog_bal_value(key: int|str, max_prog: int) -> None|str|int:
             return max_prog
 
     return None
+# endregion
 
+# region yaml loading
 def loadplayers(input_folder_name):
     weights_cache: Dict[str, Tuple[Any, ...]] = {}
     player_id = ""
-    player_files: dict[str, dict[int, Any]] = {}
+    player_files: dict[str, list[dict[str, Dict[str, Any] | Any]]] = {}
     for file in os.scandir(input_folder_name):
         fname = file.name
         name = os.path.basename(file)
@@ -213,15 +219,13 @@ def loadplayers(input_folder_name):
     weights_cache = {key: value for key, value in sorted(weights_cache.items(), key=lambda k: k[0].casefold())}
     for filename, yaml_data in weights_cache.items():
         name = os.path.basename(filename)
-        player_files[name] = {}
+        player_files[name] = []
         if name.lower() not in {"meta.yaml", "weight.yaml"}:
-            id = 0
             for yaml in yaml_data:
                 player_id = get_choice('name', yaml, 'No description specified')
                 logging.info(f"P{player_id} Weights: {filename} >> "
                              f"{get_choice('description', yaml, 'No description specified')}")
-                player_files[name][id] = yaml
-                id += 1
+                player_files[name].append(yaml)
     return player_files
 # endregion
 
