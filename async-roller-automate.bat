@@ -11,7 +11,7 @@ if not "%~1"=="" (
 
 REM The executable name
 REM set EXE_NAME=ArchipelagoGenerate.exe
-set EXE_NAME=Generate-Nicopopxd.py
+set EXE_NAME=Generate-Tweaked.py
 
 REM The output directory where .zip files are generated
 set OUTPUT_DIR=output-Async
@@ -107,6 +107,7 @@ for /f "delims=" %%C in ('tasklist /FI "WINDOWTITLE eq %WindowName%" ^| find /I 
     set COUNT=%%C
 )
 Set FileCount=0
+rem TODO FIX: 2>nul somehow crash
 for /F %%i in ('dir /A:-D /B "%OUTPUT_DIR%\*.zip" 2>nul | find /c /v ""') do set "GenFile=%%i"
 
 if !COUNT! LSS !GenCOUNT! (
