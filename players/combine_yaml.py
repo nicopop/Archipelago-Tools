@@ -7,8 +7,8 @@ if len(args) > 1:
     droppedMode = True
 
 abspath = os.path.dirname(__file__)
-input_folder = os.path.join(abspath, "input")
-output_folder = os.path.join(abspath, "output")
+input_folder = os.path.join(abspath, "input") # Change from "input" if you want to use another folder name
+output_folder = os.path.join(abspath, "output") # Change from "output" to use another folder
 output_filename = "" # Change this to define the final file name instead of the first yaml found
 
 if not droppedMode:
