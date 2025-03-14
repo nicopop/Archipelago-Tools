@@ -5,7 +5,7 @@ REM Default target number of parallel processes
 set TARGET=3
 
 REM If a command line argument is provided, use that as target
-if not "%~1"=="" (
+if not "%~1" EQU "" (
     set TARGET=%~1
 )
 
@@ -20,7 +20,7 @@ REM The output directory where .zip files are generated
 set PLAYER_DIR=Players-Async
 
 set venv=.\.venv
-rem if using a virtual enviroment use it
+rem if using a virtual environment use it
 if exist "%venv%" (
     call %venv%\scripts\activate
 )
@@ -33,7 +33,7 @@ set /p spoiler_lvl="Enter Spoiler level (default 1): "
 set skip_balancing=0
 set /p skip_balancing="Skip prog balancing? (default 0): "
 set skip_prompt=1
-set /p skip_prompt="Skip generation failure promp?(doesnt skip missing apworlds) (default 1): "
+set /p skip_prompt="Skip generation failure prompt?(doesn't skip missing apworlds) (default 1): "
 set end_loop=1
 set /p end_loop="Loop until all the gens are done or dead? (default 1): "
 set /p variant="folderVariant (default null): "
@@ -42,10 +42,10 @@ set PLAYER_DIR=%PLAYER_DIR%\%variant%
 set WindowName=AP Async Generate -%variant%
 title CMD: %WindowName%
 
-if NOT %skip_balancing% == 0 (
+if NOT %skip_balancing% EQU 0 (
   set skip_progbal=--skip_prog_balancing
 )
-if %skip_prompt% == 1 (
+if %skip_prompt% EQU 1 (
   set skip_fail_prompt=--skip_prompt
 )
 
@@ -59,9 +59,9 @@ if not exist "%OUTPUT_DIR%" (
 
 REM Check if there's any ZIP file in the output directory as a success indicator
 dir /b "%OUTPUT_DIR%\*.zip" >nul 2>nul
-if %ERRORLEVEL%==0 (
+if %ERRORLEVEL% EQU 0 (
     echo A .zip file was found in the output directory at %TIME%. Generation succeeded.
-    if !end_loop! == 1 (
+    if !end_loop! EQU 1 (
         goto End_loop_Prep
     )
     echo Terminating all remaining processes...
@@ -71,22 +71,21 @@ if %ERRORLEVEL%==0 (
 )
 rem tasklist /fi "WINDOWTITLE eq APGenerate" "IMAGENAME eq py.exe"
 REM Count how many ArchipelagoGenerate.exe are currently running
-set COUNT=0
+set ProcessCount=0
 for /f "delims=" %%C in ('tasklist /FI "WINDOWTITLE eq %WindowName%" ^| find /I /C "py.exe"') do (
-    set COUNT=%%C
+    set ProcessCount=%%C
 )
 
 
-if !COUNT! LSS %TARGET% (
-    set /a NEEDED=%TARGET%-!COUNT!
-    echo Currently running: !COUNT!. Need !NEEDED! more. At %TIME%.
+if !ProcessCount! LSS %TARGET% (
+    set /a NEEDED=%TARGET%-!ProcessCount!
+    echo Currently running: !ProcessCount!. Need !NEEDED! more. At %TIME%.
     for /l %%j in (1,1,!NEEDED!) do (
         echo Starting new %EXE_NAME% process...
         start "%WindowName%" "%EXE_NAME%" !skip_fail_prompt! !skip_progbal! --spoiler %spoiler_lvl% --multi %num_players% --outputpath .\%OUTPUT_DIR% --player_files_path .\%PLAYER_DIR%
-        rem start "%WindowName%" "%EXE_NAME%" --spoiler %spoiler_lvl% --multi %num_players% --outputpath .\%OUTPUT_DIR% --player_files_path .\%PLAYER_DIR%
     )
 ) else (
-    rem echo Currently running: !COUNT!. Waiting for results...
+    rem echo Currently running: !ProcessCount!. Waiting for results...
 )
 
 REM Short wait before checking again
@@ -94,44 +93,46 @@ timeout /t 2 /nobreak >nul
 goto MAIN_LOOP
 
 :End_loop_Prep
-Set GenCOUNT=0
+rem give time for the process to be killed
+timeout /t 2 /nobreak >nul
+Set KnownProcessCount=0
 for /f "delims=" %%C in ('tasklist /FI "WINDOWTITLE eq %WindowName%" ^| find /I /C "py.exe"') do (
-    set GenCOUNT=%%C
+    set KnownProcessCount=%%C
 )
-Set GenFile=0
-for /F %%i in ('dir /b "%OUTPUT_DIR%\*.zip" 2>nul ^| find /c /v ""') do set "GenFile=%%i"
+
+Set KnownFileCount=0
+for /F %%i in ('dir /A:-D /B "%OUTPUT_DIR%\*.zip" 2^>nul ^| find /c /v ""') do set "KnownFileCount=%%i"
 
 :End_loop
-set COUNT=0
+set ProcessCount=0
 for /f "delims=" %%C in ('tasklist /FI "WINDOWTITLE eq %WindowName%" ^| find /I /C "py.exe"') do (
-    set COUNT=%%C
+    set ProcessCount=%%C
 )
-Set FileCount=0
-rem TODO FIX: 2>nul somehow crash
-for /F %%i in ('dir /A:-D /B "%OUTPUT_DIR%\*.zip" 2>nul | find /c /v ""') do set "GenFile=%%i"
 
-if !COUNT! LSS !GenCOUNT! (
-    if !FileCount! GTR !GenFile! (
+Set FileCount=0
+for /F %%i in ('dir /A:-D /B "%OUTPUT_DIR%\*.zip" 2^>nul ^| find /c /v ""') do set "FileCount=%%i"
+
+if !ProcessCount! LSS !KnownProcessCount! (
+    if !FileCount! GTR !KnownFileCount! (
         echo A Gen finished at %TIME%.
     ) else (
         echo A Gen died at %TIME%.
     )
-        set GenFile=!FileCount!
-    if !COUNT! GTR 0 (
-        echo there are now !COUNT! gens running
-        set GenLeft=!COUNT!
+        set KnownFileCount=!FileCount!
+    if !ProcessCount! GTR 0 (
+        echo there are now !ProcessCount! gens running
+        set KnownProcessCount=!ProcessCount!
     ) else (
         echo Done. Exiting.
         exit /b 0
     )
 ) else (
-    if !COUNT! == 0(
+    if !ProcessCount! EQU 0 (
         echo Done. Exiting.
         exit /b 0
     )
-    rem echo Currently running: !COUNT!. Waiting for results...
+    rem echo Currently running: !ProcessCount!. Waiting for results...
 )
-
 
 timeout /t 2 /nobreak >nul
 goto End_loop
