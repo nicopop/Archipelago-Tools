@@ -7,10 +7,14 @@ Any script in subfolders do not follow this rule.
 
 ## Root Scripts
 
-### Generate-Tweaked.py
+### Generate_Tweaked.py
 
-- Found [here](Generate-Tweaked.py)
+- Found [here](/worlds/generate-tweaked/)
 - A drop in "replacement" for Generate.py
+- Can work either as an Apworld or from the script directly
+  - To call the apworld do `Launcher.py/ArchipelagoLauncherDebug.exe GenerateTweaked -- [add arguments here the empty -- is important]`
+  - For the script to work it must be copied to the AP source install folder directly  
+    Then you can call it directly like so: `Generate_Tweaked.py [Arguments here]`
 - Every argument Generate.py support works with it
 - Some custom Arguments are added:
   - `--max_prog_balancing -1/[0-99]` default: -1
@@ -24,7 +28,7 @@ Any script in subfolders do not follow this rule.
   - `--skip_prompt`
     - When added disable the "Press enter to close"
     - Useful when combined with some script like [automatic async roller](async-roller-automate.bat) to let the generator start over automatically on failure.
-    - **Known exception:** Doesn't stop the prompt when a yaml is invalid.
+    - **Known exception for the Script version:** Doesn't stop the prompt when a yaml is invalid.
 
 ### async-roller-automate.bat
 

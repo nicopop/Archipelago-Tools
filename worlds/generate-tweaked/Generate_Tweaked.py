@@ -6,6 +6,7 @@ from argparse import ArgumentParser, ArgumentTypeError, Namespace
 from BaseClasses import PlandoOptions
 from Options import ProgressionBalancing
 from typing import Tuple, Any, Dict
+from Utils import version_tuple
 
 def main(args: Namespace):
 #region meta.yaml
@@ -230,7 +231,7 @@ def loadplayers(input_folder_name):
 # endregion
 
 # region Arguments
-def mystery_argparse(): # Modified arguments From 0.6.0 Generate.py
+def mystery_argparse(Args: Tuple|list): # Modified arguments From 0.6.0 Generate.py
     from settings import get_settings
     def int_range(min_val: int, max_val: int):
         def int_range_checker(arg):
@@ -246,7 +247,7 @@ def mystery_argparse(): # Modified arguments From 0.6.0 Generate.py
     settings = get_settings()
     defaults = settings.generator
 
-    parser = ArgumentParser(prog="apgeneratebutlpb", description="CMD Generation Interface, defaults come from host.yaml.")
+    parser = ArgumentParser(prog="APGenerateTweaked", description="CMD Generation Interface, defaults come from host.yaml.")
     parser.add_argument('--weights_file_path', default=defaults.weights_file_path,
                         help='Path to the weights file to use for rolling game options, urls are also valid')
     parser.add_argument('--sameoptions', help='Rolls options per weights file rather than per player',
@@ -260,9 +261,13 @@ def mystery_argparse(): # Modified arguments From 0.6.0 Generate.py
                         help="Path to output folder. Absolute or relative to cwd.")  # absolute or relative to cwd
     parser.add_argument('--race', action='store_true', default=defaults.race)
     parser.add_argument('--meta_file_path', default=defaults.meta_file_path)
-    parser.add_argument('--log_level', default=defaults.loglevel, help='Sets log level')
-    parser.add_argument('--log_time', help="Add timestamps to STDOUT",
-                        default=defaults.logtime, action='store_true')
+
+    default_loglevel = defaults.loglevel if hasattr(defaults, "loglevel") else settings.server_options.loglevel
+    parser.add_argument('--log_level', default=default_loglevel, help='Sets log level')
+    if version_tuple.minor >= 6:
+        parser.add_argument('--log_time', help="Add timestamps to STDOUT",
+                            default=defaults.logtime, action='store_true')
+
     parser.add_argument("--csv_output", action="store_true",
                         help="Output rolled player options to csv (made for async multiworld).")
     parser.add_argument("--plando", default=defaults.plando_options,
@@ -277,7 +282,7 @@ def mystery_argparse(): # Modified arguments From 0.6.0 Generate.py
     parser.add_argument("--skip_prompt", action="store_true",
                     help="Skips generation stopping with the 'press enter to close' prompt")
 
-    args: Namespace = parser.parse_args()
+    args: Namespace = parser.parse_args(Args)
     if not os.path.isabs(args.weights_file_path):
         args.weights_file_path = os.path.join(args.player_files_path, args.weights_file_path)
     if not os.path.isabs(args.meta_file_path):
@@ -287,9 +292,14 @@ def mystery_argparse(): # Modified arguments From 0.6.0 Generate.py
 # endregion
 
 # region Start
+def start(*args):
+    args = mystery_argparse(args)
+    main(args)
+
 if __name__ == '__main__':
+    import sys
     import atexit
-    args = mystery_argparse()
+    args = mystery_argparse(sys.argv[1:])
     confirmation = atexit.register(input, "Press enter to close.")
     if args.skip_prompt: atexit.unregister(confirmation)
     main(args)
