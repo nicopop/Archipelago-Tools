@@ -1,6 +1,6 @@
 # Archipelago-Tools
 
-A Collection of tools made to be used with [Archipelago](https://github.com/ArchipelagoMW/Archipelago)
+A Collection of tools I made to be used with [Archipelago](https://github.com/ArchipelagoMW/Archipelago)
 
 Scripts in the root folder need to be dropped in the Archipelago folder to work.  
 Any script in subfolders do not follow this rule.
@@ -10,6 +10,7 @@ Any script in subfolders do not follow this rule.
 ### Generate_Tweaked.py
 
 - Found [here](/worlds/generate-tweaked/)
+- Inspired by [Archipelago fuzzer](https://github.com/Eijebong/Archipelago-fuzzer) from which I learned out how to call AP's generate.py
 - A drop in "replacement" for Generate.py
 - Can work either as an Apworld or from the script directly
   - To call the apworld do `Launcher.py/ArchipelagoLauncherDebug.exe GenerateTweaked -- [add arguments here the empty -- is important]`
@@ -33,6 +34,7 @@ Any script in subfolders do not follow this rule.
 ### async-roller-automate.bat
 
 - Found [here](async-roller-automate.bat)
+- Based on an earlier version of this script someone dropped in an async discussion on discord
 - Batch script that let you automatically roll multiple generation at the same time
 - it has a couple options in the 22 first lines of the script that let you customize what program is used to generate, where to take the player yamls and where to put the final zips
 - Once launched it will ask a couple questions to tweak the generation
