@@ -11,14 +11,20 @@ if not "%~1" EQU "" (
 
 REM The executable name
 REM set EXE_NAME=ArchipelagoGenerate.exe
-set EXE_NAME=Generate-Tweaked.py
+rem set EXE_NAME=Generate-Tweaked.py
+if exist Launcher.py (
+    set EXE_NAME=Launcher.py
+) else (
+    set EXE_NAME=ArchipelagoLauncherDebug.exe
+)
 
 REM The output directory where .zip files are generated
 set OUTPUT_DIR=output-Async
 
-REM The output directory where .zip files are generated
+REM The player directory where .yaml files are found
 set PLAYER_DIR=Players-Async
 
+set Extra_Args=--cache_modified_player_yamls
 set venv=.\.venv
 rem if using a virtual environment use it
 if exist "%venv%" (
@@ -27,7 +33,9 @@ if exist "%venv%" (
 
 set /p TARGET="Enter number of games to generate (default 3): "
 set num_players=1
-set /p num_players="Enter number of worlds to generate (default 1): "
+echo Enter number of worlds to generate
+echo Only changes things if this number is bigger than the total player yamls count
+set /p num_players="Unless you use a weights.yaml you can leave this as default (default 1):"
 set spoiler_lvl=1
 set /p spoiler_lvl="Enter Spoiler level (default 1): "
 set skip_balancing=0
@@ -82,7 +90,8 @@ if !ProcessCount! LSS %TARGET% (
     echo Currently running: !ProcessCount!. Need !NEEDED! more. At %TIME%.
     for /l %%j in (1,1,!NEEDED!) do (
         echo Starting new %EXE_NAME% process...
-        start "%WindowName%" "%EXE_NAME%" !skip_fail_prompt! !skip_progbal! --spoiler %spoiler_lvl% --multi %num_players% --outputpath .\%OUTPUT_DIR% --player_files_path .\%PLAYER_DIR%
+        start "%WindowName%" "%EXE_NAME%" GenerateTweaked -- !skip_fail_prompt! !skip_progbal! --spoiler %spoiler_lvl% --multi %num_players% --outputpath .\%OUTPUT_DIR% --player_files_path .\%PLAYER_DIR% %Extra_Args%
+        timeout /t 1 /nobreak >nul
     )
 ) else (
     rem echo Currently running: !ProcessCount!. Waiting for results...
