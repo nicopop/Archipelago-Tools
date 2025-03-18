@@ -182,7 +182,8 @@ def main(args: Namespace):
 
     if not args.keep_folder_on_output:
         logging.info("Deleting Cache/temp folder")
-        shutil.rmtree(yaml_path_dir) #if it didn't crash delete the folder
+        if os.path.exists(yaml_path_dir):
+            shutil.rmtree(yaml_path_dir) #if it didn't crash delete the folder
 # endregion Generation
 
 # region Misc functions

@@ -14,8 +14,10 @@ null:
   max_progression_balancing: # The maximum value allowed for progression_balancing
     normal: 0 # Force every player into default or below progression balancing
     disabled: 0 # Force every player out of progression balancing, then prepare for a lot of logical BK
-    null: 1 # Let players decide via their own progression_balancing setting in their yaml, aka 100
-    30: 0 # You can set this to any integer value from 0 to 100
+    null: 1 # Let players decide via their own progression_balancing setting in their yaml, aka 99
+    30: 0 # You can set this to any integer value from 0 to 99
+    random: 0 # You can even use random if you want
+    random-range-0-30: 0 # or a range
 
   accessibility:
     all: 0
