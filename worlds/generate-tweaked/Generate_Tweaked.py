@@ -38,9 +38,17 @@ def main(args: Namespace):
     else:
         meta_weights = {}
 
+    def handle_meta_prog_bal_value(value: str|int|None) -> int:
+        if value is None:
+            return ProgressionBalancing.range_end
+        if isinstance(value, int) and 0 <= value <= 99:
+            return value
+        option = ProgressionBalancing.from_any(value)
+        return option.value
+
     if args.max_prog_balancing == -1:
         root = meta_weights.get(None, {})
-        args.max_prog_balancing = handle_meta_prog_bal_value(get_choice("max_progression_balancing", root, 99))
+        args.max_prog_balancing = handle_meta_prog_bal_value(get_choice("max_progression_balancing", root, None))
 
 # endregion weights.yaml + meta.yaml processing
 
@@ -154,7 +162,7 @@ def main(args: Namespace):
             FileName.close()
             os.remove(lockfilepath)
     else: # No cache
-        yaml_path_dir = tempfile.mkdtemp(prefix="apgenerate")
+        yaml_path_dir = tempfile.mkdtemp(prefix="ApGenerateTweaked")
         logging.info(f"Cache disabled, Time to do it all  at '{yaml_path_dir}'.")
         prog_balancing_adjustments()
         dump_yamls_to_folder(yaml_path_dir)
@@ -169,21 +177,15 @@ def main(args: Namespace):
     logging.info("Starting full Generation.")
     logging.info(f"Logs past this are saved in Generate_{args.seed}_{datetime.now().strftime('%Y_%m_%d_%H_%M_%S')}.txt")
 
-    erargs, seed = GenMain(args)
-    ERmain(erargs, seed)
+    ERargs, seed = GenMain(args)
+    ERmain(ERargs, seed)
 
     if not args.keep_folder_on_output:
         logging.info("Deleting Cache/temp folder")
-        shutil.rmtree(yaml_path_dir) #if it didnt crash delete the folder
+        shutil.rmtree(yaml_path_dir) #if it didn't crash delete the folder
 # endregion Generation
 
 # region Misc functions
-def handle_meta_prog_bal_value(value: str|int) -> int:
-    if isinstance(value, int) and 0 <= value <= 99:
-        return value
-    option = ProgressionBalancing.from_any(value)
-    return option.value
-
 def get_choice(option, root, value=None, return_all = False) -> Any:
     if option not in root:
         return value
@@ -355,7 +357,7 @@ def mystery_argparse(Args: Tuple|list): # Modified arguments From 0.6.0 Generate
     parser.add_argument("--cache_modified_player_yamls", action="store_true",
                     help="Keep a cache of the modified player yamls. Useful for multi-process generation.")
     parser.add_argument("--keep_folder_on_output", action="store_true",
-                    help="Should the temporary/cache folder not be deleted on succesful output")
+                    help="Should the temporary/cache folder not be deleted on successful output")
 
     args: Namespace = parser.parse_args(Args)
     if not os.path.isabs(args.weights_file_path):
