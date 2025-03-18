@@ -1,12 +1,14 @@
-import os, logging, yaml, random, tempfile, shutil
+import os, logging, yaml, random, tempfile, shutil, zlib
+from datetime import datetime
 from pathlib import Path
 from Generate import main as GenMain, read_weights_yamls
 from Main import main as ERmain
 from argparse import ArgumentParser, ArgumentTypeError, Namespace
-from BaseClasses import PlandoOptions
+from BaseClasses import PlandoOptions, get_seed
 from Options import ProgressionBalancing
 from typing import Tuple, Any, Dict
-from Utils import version_tuple
+from Utils import version_tuple, init_logging
+
 
 def main(args: Namespace):
 #region meta.yaml
@@ -46,11 +48,13 @@ def main(args: Namespace):
     player_cache = loadplayers(player_path)
 
 # region prog_balancing
-    if int(args.max_prog_balancing) < 100:
+    def prog_balancing_adjustments():
+        logging.info("Analazing the yamls for prog_balancing values above the maximum allowed")
         for player, player_yaml in player_cache.items():
             i = 0
             for sub_yaml in player_yaml:
                 games = get_choice("game", sub_yaml, "Archipelago", True)
+                name = get_choice("name", sub_yaml, "")
                 if isinstance(games, str):
                     games = [games]
                 elif isinstance(games, dict):
@@ -65,48 +69,113 @@ def main(args: Namespace):
                         prog_bal_value = handle_meta_prog_bal_value(ProgressionBalancing.default)
 
                     if isinstance(prog_bal_value, dict):
+                        found_any = False
                         for pb_key, weight in dict(prog_bal_value.items()).items():
                             if weight == 0:
                                 continue
                             proccessed = process_prog_bal_value(pb_key, max_prog)
                             if proccessed is not None:
+                                found_any = True
                                 del player_cache[player][i][option_key]["progression_balancing"][pb_key]
                                 if proccessed not in player_cache[player][i][option_key]["progression_balancing"].keys():
                                     player_cache[player][i][option_key]["progression_balancing"][proccessed] = weight
                                 else:
                                     player_cache[player][i][option_key]["progression_balancing"][proccessed] += weight #combine the weight
+                        if found_any:
+                            logging.debug(f"Found a value in {player}'s yaml in {name}->{option_key} above {max_prog}.")
                     else:
                         proccessed = process_prog_bal_value(prog_bal_value, max_prog)
                         if proccessed is not None:
+                            logging.debug(f"Found a value in {player}'s yaml in {name}->{option_key} above {max_prog}.")
                             player_cache[player][i][option_key]["progression_balancing"] = proccessed
                 i += 1
+# endregion prog_balancing
 
-# endregion prog_balancing adjustments
+# region Dumping yaml
+    def dump_yamls_to_folder(yaml_path_dir: str):
+        logging.info(f"Creating new Yaml files in folder")
+        if meta_weights and Path(player_path) in Path(args.meta_file_path).parents: # if its in the player folder
+            player_cache[Path(args.meta_file_path).name] = [meta_weights]
+        if weights_file and Path(player_path) in Path(args.weights_file_path).parents: # if its in the player folder
+            player_cache[Path(args.weights_file_path).name] = [weights_file]
 
-# region Temp folder
-    yaml_path_dir = tempfile.mkdtemp(prefix="apgenerate")
+        for file, content in player_cache.items():
+            yaml_path = os.path.join(yaml_path_dir, file)
+            with open(yaml_path, "w+", encoding="utf-8") as f:
+                yaml.dump_all(content, f, sort_keys=False)
 
-    if meta_weights and Path(player_path) in Path(args.meta_file_path).parents: # if its in the player folder
-        player_cache[Path(args.meta_file_path).name] = [meta_weights]
-    if weights_file and Path(player_path) in Path(args.weights_file_path).parents: # if its in the player folder
-        player_cache[Path(args.weights_file_path).name] = [weights_file]
+# endregion Dumping yaml
 
-    for file, content in player_cache.items():
-        yaml_path = os.path.join(yaml_path_dir, file)
-        with open(yaml_path, "w+", encoding="utf-8") as f:
-            yaml.dump_all(content, f, sort_keys=False)
+# region Cache
+    if args.cache_modified_player_yamls:
+        checksum_cache = player_cache
+        if meta_weights and Path(player_path) in Path(args.meta_file_path).parents: # if its in the player folder
+            checksum_cache[Path(args.meta_file_path).name] = [meta_weights]
+        if weights_file and Path(player_path) in Path(args.weights_file_path).parents: # if its in the player folder
+            checksum_cache[Path(args.weights_file_path).name] = [weights_file]
 
+        checksum: int=0
+        for item in sorted(checksum_cache.items()):
+            c1 = 1
+            for t in item:
+                c1 = zlib.adler32(bytes(repr(t),'utf-8'), c1)
+            checksum=checksum ^ c1
+        timestamped_checksum: str = f"{checksum}-{args.max_prog_balancing}-{datetime.today().strftime('%Y-%m-%d')}"
+
+        folder = tempfile.gettempdir()
+        yaml_path_dir = os.path.join(folder, "ApGenerateTweakedCache", timestamped_checksum)
+        lockfilepath = os.path.join(yaml_path_dir, "lock.lck")
+        if os.path.exists(yaml_path_dir): #probably wait if not done or use the data already there otherwise.
+            logging.info(f"Found an existing Cache folder at '{yaml_path_dir}'.")
+            if os.path.exists(lockfilepath):
+                import time
+                interval = 5
+                waited = 0
+                logging.info("Found a lock file, another process is still working on generation.")
+                while os.path.exists(lockfilepath):
+                    try:
+                        tmp = open(lockfilepath, "r+")
+                        logging.error("Seems like the lock file died ")
+                        tmp.close()
+                        raise Exception(f"The lock file got unlocked before being deleted. \nfound here: {lockfilepath}")
+                    except IOError:
+                        logging.debug("lock file is still locked, good.")
+                    time.sleep(interval)
+                    waited += interval
+                    if waited > 3600: #1 hour
+                        raise Exception("Waited too long for the lock file to get removed, you might have an issue or too many yamls")
+
+        else: # this process is the first :D
+            logging.info(f"No existing Cache folder found, Time to create it at '{yaml_path_dir}'.")
+            os.makedirs(yaml_path_dir, exist_ok=True)
+            FileName = open(lockfilepath,"w+")
+            prog_balancing_adjustments()
+            dump_yamls_to_folder(yaml_path_dir)
+            FileName.close()
+            os.remove(lockfilepath)
+    else: # No cache
+        yaml_path_dir = tempfile.mkdtemp(prefix="apgenerate")
+        logging.info(f"Cache disabled, Time to do it all  at '{yaml_path_dir}'.")
+        prog_balancing_adjustments()
+        dump_yamls_to_folder(yaml_path_dir)
+
+# endregion Cache
+
+# region Generation
     args.player_files_path = yaml_path_dir # Update Args path for generation
     args.meta_file_path = os.path.join(yaml_path_dir, Path(args.meta_file_path).name)
     args.weights_file_path = os.path.join(yaml_path_dir, Path(args.weights_file_path).name)
-# endregion Temp folder
 
-# region Generation
+    logging.info("Starting full Generation.")
+    logging.info(f"Logs past this are saved in Generate_{args.seed}_{datetime.now().strftime('%Y_%m_%d_%H_%M_%S')}.txt")
 
     erargs, seed = GenMain(args)
     ERmain(erargs, seed)
-    shutil.rmtree(yaml_path_dir) #if it didnt crash delete the folder
-# endregion
+
+    if not args.keep_folder_on_output:
+        logging.info("Deleting Cache/temp folder")
+        shutil.rmtree(yaml_path_dir) #if it didnt crash delete the folder
+# endregion Generation
 
 # region Misc functions
 def handle_meta_prog_bal_value(value: str|int) -> int:
@@ -154,7 +223,7 @@ def get_prog_bal_int_value(value: int|str|None) -> int|str:
 
     try:
         intvalue = int(value)
-    except ValueError:
+    except ValueError as ex:
         if value in ProgressionBalancing.special_range_names.keys():
             intvalue = ProgressionBalancing.special_range_names[value]
         elif value.startswith("random"):
@@ -163,7 +232,7 @@ def get_prog_bal_int_value(value: int|str|None) -> int|str:
             else:
                 intvalue = "random"
         else:
-            raise Exception("how did I get here...")
+            raise ex
     return intvalue
 
 def process_prog_bal_value(key: int|str, max_prog: int) -> None|str|int:
@@ -218,15 +287,17 @@ def loadplayers(input_folder_name):
             except Exception as e:
                 raise ValueError(f"File {fname} is invalid. Please fix your yaml.") from e
     weights_cache = {key: value for key, value in sorted(weights_cache.items(), key=lambda k: k[0].casefold())}
+    i = 0
     for filename, yaml_data in weights_cache.items():
         name = os.path.basename(filename)
         player_files[name] = []
         if name.lower() not in {"meta.yaml", "weight.yaml"}:
             for yaml in yaml_data:
                 player_id = get_choice('name', yaml, 'No description specified')
-                logging.info(f"P{player_id} Weights: {filename} >> "
+                logging.info(f"P {i} ({player_id}) Weights: {filename} >> "
                              f"{get_choice('description', yaml, 'No description specified')}")
                 player_files[name].append(yaml)
+                i += 1
     return player_files
 # endregion
 
@@ -281,6 +352,10 @@ def mystery_argparse(Args: Tuple|list): # Modified arguments From 0.6.0 Generate
                              "Intended for debugging and testing purposes.")
     parser.add_argument("--skip_prompt", action="store_true",
                     help="Skips generation stopping with the 'press enter to close' prompt")
+    parser.add_argument("--cache_modified_player_yamls", action="store_true",
+                    help="Keep a cache of the modified player yamls. Useful for multi-process generation.")
+    parser.add_argument("--keep_folder_on_output", action="store_true",
+                    help="Should the temporary/cache folder not be deleted on succesful output")
 
     args: Namespace = parser.parse_args(Args)
     if not os.path.isabs(args.weights_file_path):
@@ -294,12 +369,16 @@ def mystery_argparse(Args: Tuple|list): # Modified arguments From 0.6.0 Generate
 # region Start
 def start(*args):
     args = mystery_argparse(args)
+    args.seed = get_seed(args.seed)
+    init_logging(f"GenerateTweaked_{args.seed}", loglevel=args.log_level)
     main(args)
 
 if __name__ == '__main__':
     import sys
     import atexit
     args = mystery_argparse(sys.argv[1:])
+    args.seed = get_seed(args.seed)
+    init_logging(f"GenerateTweaked_{args.seed}", loglevel=args.log_level)
     confirmation = atexit.register(input, "Press enter to close.")
     if args.skip_prompt: atexit.unregister(confirmation)
     main(args)
