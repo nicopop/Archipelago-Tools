@@ -10,10 +10,10 @@ if not "%~1" EQU "" (
 )
 
 REM The output directory where .zip files are generated
-set OUTPUT_DIR=output-Async
+set OUTPUT_DIR=output
 
 REM The player directory where .yaml files are found
-set PLAYER_DIR=Players-Async
+set PLAYER_DIR=Players
 
 set Extra_Args=--cache_modified_player_yamls
 set venv=.\.venv
@@ -44,13 +44,17 @@ set skip_prompt=1
 set /p skip_prompt="Skip generation failure prompt?(doesn't skip missing apworlds) (default 1): "
 set end_loop=1
 set /p end_loop="Loop until all the gens are done or dead? (default 1): "
-set /p variant="folderVariant (default null): "
-set OUTPUT_DIR=%OUTPUT_DIR%\%variant%
-set PLAYER_DIR=%PLAYER_DIR%\%variant%
+echo Subfolder name for player/output folder
+echo AKA where to get the yamls in the %PLAYER_DIR% folder
+echo AND where to put the zip in the %OUTPUT_DIR% folder
+echo EX: using '8th' will check files in %PLAYER_DIR%\8th\
+set /p subfolder="Default to just using %PLAYER_DIR%/%OUTPUT_DIR% directly: "
+set OUTPUT_DIR=%OUTPUT_DIR%\%subfolder%
+set PLAYER_DIR=%PLAYER_DIR%\%subfolder%
 
 set WindowName=AP Async Generate
-if [%variant%] NEQ [] (
-    set WindowName=AP Async Generate %variant%
+if [%subfolder%] NEQ [] (
+    set WindowName=AP Async Generate %subfolder%
 )
 
 title CMD: %WindowName%

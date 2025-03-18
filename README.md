@@ -39,5 +39,3 @@ Any script in subfolders do not follow this rule.
 - it has a couple options in the 22 first lines of the script that let you customize what program is used to generate, where to take the player yamls and where to put the final zips
 - Once launched it will ask a couple questions to tweak the generation
   - Simply press enter to use the default value
-  - folderVariant mean the name of a subfolder in the player/output folder to use
-    - EX: `8th` will check files in `Players\8th\`
