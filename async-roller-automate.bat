@@ -9,15 +9,6 @@ if not "%~1" EQU "" (
     set TARGET=%~1
 )
 
-REM The executable name
-REM set EXE_NAME=ArchipelagoGenerate.exe
-rem set EXE_NAME=Generate-Tweaked.py
-if exist Launcher.py (
-    set EXE_NAME=Launcher.py
-) else (
-    set EXE_NAME=ArchipelagoLauncherDebug.exe
-)
-
 REM The output directory where .zip files are generated
 set OUTPUT_DIR=output-Async
 
@@ -29,6 +20,15 @@ set venv=.\.venv
 rem if using a virtual environment use it
 if exist "%venv%" (
     call %venv%\scripts\activate
+)
+
+REM The executable name and the string to find the process
+if exist Launcher.py (
+    set EXE_NAME=Launcher.py
+    set Finder=py.exe
+) else (
+    set EXE_NAME=ArchipelagoLauncherDebug.exe
+    set Finder=ArchipelagoLauncherDebug
 )
 
 set /p TARGET="Enter number of games to generate (default 3): "
@@ -47,14 +47,19 @@ set /p end_loop="Loop until all the gens are done or dead? (default 1): "
 set /p variant="folderVariant (default null): "
 set OUTPUT_DIR=%OUTPUT_DIR%\%variant%
 set PLAYER_DIR=%PLAYER_DIR%\%variant%
-set WindowName=AP Async Generate -%variant%
+
+set WindowName=AP Async Generate
+if [%variant%] NEQ [] (
+    set WindowName=AP Async Generate %variant%
+)
+
 title CMD: %WindowName%
 
 if NOT %skip_balancing% EQU 0 (
-  set skip_progbal=--skip_prog_balancing
+    set skip_progbal=--skip_prog_balancing
 )
 if %skip_prompt% EQU 1 (
-  set skip_fail_prompt=--skip_prompt
+    set skip_fail_prompt=--skip_prompt
 )
 
 REM Ensure output directory exists
@@ -80,7 +85,7 @@ if %ERRORLEVEL% EQU 0 (
 rem tasklist /fi "WINDOWTITLE eq APGenerate" "IMAGENAME eq py.exe"
 REM Count how many ArchipelagoGenerate.exe are currently running
 set ProcessCount=0
-for /f "delims=" %%C in ('tasklist /FI "WINDOWTITLE eq %WindowName%" ^| find /I /C "py.exe"') do (
+for /f "delims=" %%C in ('tasklist /FI "WINDOWTITLE eq %WindowName%" ^| find /I /C "%Finder%"') do (
     set ProcessCount=%%C
 )
 
@@ -105,7 +110,7 @@ goto MAIN_LOOP
 rem give time for the process to be killed
 timeout /t 2 /nobreak >nul
 Set KnownProcessCount=0
-for /f "delims=" %%C in ('tasklist /FI "WINDOWTITLE eq %WindowName%" ^| find /I /C "py.exe"') do (
+for /f "delims=" %%C in ('tasklist /FI "WINDOWTITLE eq %WindowName%" ^| find /I /C "%Finder%"') do (
     set KnownProcessCount=%%C
 )
 
@@ -114,7 +119,7 @@ for /F %%i in ('dir /A:-D /B "%OUTPUT_DIR%\*.zip" 2^>nul ^| find /c /v ""') do s
 
 :End_loop
 set ProcessCount=0
-for /f "delims=" %%C in ('tasklist /FI "WINDOWTITLE eq %WindowName%" ^| find /I /C "py.exe"') do (
+for /f "delims=" %%C in ('tasklist /FI "WINDOWTITLE eq %WindowName%" ^| find /I /C "%Finder%"') do (
     set ProcessCount=%%C
 )
 
