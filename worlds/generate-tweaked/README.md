@@ -15,7 +15,7 @@
   - An alternative to the Argument is to add a `max_progression_balancing` setting to your meta.yaml to use this in a more complex way
     - Any Value the main prog_balancing option supports is compatible
     - The maximum can be set per game
-    - Check the [template](meta.yaml) for an example
+    - Check the [template](/meta.yaml) for an example
   - `--skip_prompt`
     - When added disable the "Press enter to close"
     - Useful when combined with some script like [automatic async roller](async-roller-automate.bat) to let the generator start over automatically on failure.
