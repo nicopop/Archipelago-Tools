@@ -29,13 +29,17 @@ Any script in subfolders do not follow this rule.
   - `--skip_prompt`
     - When added disable the "Press enter to close"
     - Useful when combined with some script like [automatic async roller](async-roller-automate.bat) to let the generator start over automatically on failure.
-    - **Known exception for the Script version:** Doesn't stop the prompt when a yaml is invalid.
+  - `--cache_modified_player_yamls`
+    - Keep a cache of the modified player yamls named using the checksum of the player yamls. Useful for multi-process generation.
+  - `--keep_folder_on_output`
+    - When included the temporary/cache folder is not be deleted on successful output.
+  - **Known exception for the Script version:** Doesn't stop the prompt when a yaml is invalid.
 
 ### async-roller-automate.bat
 
 - Found [here](async-roller-automate.bat)
 - Based on an earlier version of this script someone dropped in an async discussion on discord
 - Batch script that let you automatically roll multiple generation at the same time
-- it has a couple options in the 22 first lines of the script that let you customize what program is used to generate, where to take the player yamls and where to put the final zips
+- it has a couple options in the 20 first lines of the script that let you customize the args it uses, where it take the player yamls and where it put the final zips
 - Once launched it will ask a couple questions to tweak the generation
   - Simply press enter to use the default value
