@@ -11,6 +11,7 @@ from Utils import version_tuple, init_logging
 
 
 def main(args: Namespace):
+    logging.info(f"{display_name} version: {(pretty_version())} (YYYY-MM-DD) started.")
 #region meta.yaml
     if args.weights_file_path and os.path.exists(args.weights_file_path):
         try:
@@ -56,7 +57,8 @@ def main(args: Namespace):
     player_cache = loadplayers(player_path)
 
 # region prog_balancing
-    def prog_balancing_adjustments():
+    def prog_balancing_adjustments() -> int:
+        found = 0
         logging.info("Analazing the yamls for prog_balancing values above the maximum allowed")
         for player, player_yaml in player_cache.items():
             i = 0
@@ -84,6 +86,7 @@ def main(args: Namespace):
                             proccessed = process_prog_bal_value(pb_key, max_prog)
                             if proccessed is not None:
                                 found_any = True
+                                found += 1
                                 del player_cache[player][i][option_key]["progression_balancing"][pb_key]
                                 if proccessed not in player_cache[player][i][option_key]["progression_balancing"].keys():
                                     player_cache[player][i][option_key]["progression_balancing"][proccessed] = weight
@@ -94,9 +97,13 @@ def main(args: Namespace):
                     else:
                         proccessed = process_prog_bal_value(prog_bal_value, max_prog)
                         if proccessed is not None:
+                            found += 1
                             logging.debug(f"Found a value in {player}'s yaml in {name}->{option_key} above {max_prog}.")
                             player_cache[player][i][option_key]["progression_balancing"] = proccessed
                 i += 1
+        found_txt = found if found > 0 else 'No'
+        logging.info(f"{found_txt} incorrect prog_balancing value{'s' if found > 1 else ''} were found and corrected.")
+        return found
 # endregion prog_balancing
 
 # region Dumping yaml
@@ -131,7 +138,7 @@ def main(args: Namespace):
         timestamped_checksum: str = f"{checksum}-{args.max_prog_balancing}-{datetime.today().strftime('%Y-%m-%d')}"
 
         folder = tempfile.gettempdir()
-        yaml_path_dir = os.path.join(folder, "ApGenerateTweakedCache", timestamped_checksum)
+        yaml_path_dir = os.path.join(folder, f"Ap{display_name}Cache", timestamped_checksum)
         lockfilepath = os.path.join(yaml_path_dir, "lock.lck")
         if os.path.exists(yaml_path_dir): #probably wait if not done or use the data already there otherwise.
             logging.info(f"Found an existing Cache folder at '{yaml_path_dir}'.")
@@ -162,8 +169,8 @@ def main(args: Namespace):
             FileName.close()
             os.remove(lockfilepath)
     else: # No cache
-        yaml_path_dir = tempfile.mkdtemp(prefix="ApGenerateTweaked")
-        logging.info(f"Cache disabled, Time to do it all  at '{yaml_path_dir}'.")
+        yaml_path_dir = tempfile.mkdtemp(prefix=f"Ap{display_name}")
+        logging.info(f"Cache disabled, Time to do it all at '{yaml_path_dir}'.")
         prog_balancing_adjustments()
         dump_yamls_to_folder(yaml_path_dir)
 
@@ -187,6 +194,9 @@ def main(args: Namespace):
 # endregion Generation
 
 # region Misc functions
+def pretty_version() -> str:
+    return str(version)[:4] + '-' +str(version)[4:6] + '-' +str(version)[-2:]
+
 def get_choice(option, root, value=None, return_all = False) -> Any:
     if option not in root:
         return value
@@ -321,7 +331,7 @@ def mystery_argparse(Args: Tuple|list): # Modified arguments From 0.6.0 Generate
     settings = get_settings()
     defaults = settings.generator
 
-    parser = ArgumentParser(prog="APGenerateTweaked", description="CMD Generation Interface, defaults come from host.yaml.")
+    parser = ArgumentParser(prog=display_name, description="CMD Generation Interface, defaults come from host.yaml.")
     parser.add_argument('--weights_file_path', default=defaults.weights_file_path,
                         help='Path to the weights file to use for rolling game options, urls are also valid')
     parser.add_argument('--sameoptions', help='Rolls options per weights file rather than per player',
@@ -370,10 +380,12 @@ def mystery_argparse(Args: Tuple|list): # Modified arguments From 0.6.0 Generate
 # endregion
 
 # region Start
+version = 2025_03_24 # YYYYMMDD
+display_name = "GenerateTweaked"
 def start(*args):
     args = mystery_argparse(args)
     args.seed = get_seed(args.seed)
-    init_logging(f"GenerateTweaked_{args.seed}", loglevel=args.log_level)
+    init_logging(f"{display_name}_{args.seed}", loglevel=args.log_level)
     main(args)
 
 if __name__ == '__main__':
@@ -381,7 +393,8 @@ if __name__ == '__main__':
     import atexit
     args = mystery_argparse(sys.argv[1:])
     args.seed = get_seed(args.seed)
-    init_logging(f"GenerateTweaked_{args.seed}", loglevel=args.log_level)
+    init_logging(f"{display_name}_{args.seed}", loglevel=args.log_level)
+
     confirmation = atexit.register(input, "Press enter to close.")
     if args.skip_prompt: atexit.unregister(confirmation)
     main(args)
