@@ -9,6 +9,13 @@ from Options import ProgressionBalancing
 from typing import Tuple, Any, Dict
 from Utils import version_tuple, init_logging
 
+class GeneratorException(Exception):
+    def __init__(self, message, step: int):
+        # Call the base class constructor with the parameters it needs
+        super().__init__(message)
+
+        # Now for your custom code...
+        self.step: int = step
 
 def main(args: Namespace):
     logging.info(f"{display_name} version: {(pretty_version())} (YYYY-MM-DD) started.")
@@ -184,8 +191,19 @@ def main(args: Namespace):
     logging.info("Starting full Generation.")
     logging.info(f"Logs past this are saved in Generate_{args.seed}_{datetime.now().strftime('%Y_%m_%d_%H_%M_%S')}.txt")
 
-    ERargs, seed = GenMain(args)
-    ERmain(ERargs, seed)
+    state = "Generate's Main"
+    step = 1
+    try:
+        ERargs, seed = GenMain(args)
+        state = "Main's... Main"
+        step = 2
+        ERmain(ERargs, seed)
+    except Exception as ex:
+        raise GeneratorException(f"Base AP's generation failed in {state} \
+                                    \n{type(ex).__name__}: {ex}\
+                                    \n\nMore info in the stacktrace before the GeneratorException."
+                                    , step) from ex
+
 
     if not args.keep_folder_on_output:
         logging.info("Deleting Cache/temp folder")
@@ -396,8 +414,19 @@ if __name__ == '__main__':
     init_logging(f"{display_name}_{args.seed}", loglevel=args.log_level)
 
     confirmation = atexit.register(input, "Press enter to close.")
-    if args.skip_prompt: atexit.unregister(confirmation)
-    main(args)
-    # in case of error-free exit should not need confirmation
-    atexit.unregister(confirmation)
+    skip_prompt = bool(args.skip_prompt)
+    exception = False
+    try:
+        main(args)
+    except GeneratorException as ex:
+        exception = True
+        logging.exception(ex)
+        if ex.step == 1: # If its in Generate's main aka Yaml handling don't skip
+            skip_prompt = False
+    except Exception as ex:
+        exception = True
+        logging.exception(ex)
+    finally: # in case of error-free exit should not need confirmation
+        if not exception or skip_prompt:
+            atexit.unregister(confirmation)
 # endregion
