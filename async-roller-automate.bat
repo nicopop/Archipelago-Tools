@@ -1,36 +1,44 @@
 @echo off
 setlocal ENABLEDELAYEDEXPANSION
-
-REM Default target number of parallel processes
-set TARGET=3
-
-REM If a command line argument is provided, use that as target
-if not "%~1" EQU "" (
-    set TARGET=%~1
-)
-
 REM The output directory where .zip files are generated
 set OUTPUT_DIR=output
 
 REM The player directory where .yaml files are found
 set PLAYER_DIR=Players
 
-set Extra_Args=--cache_modified_player_yamls
+set Extra_Args=GenerateTweaked -- --cache_modified_player_yamls
+
+rem A Custom executable called to generate, by default will detect AP's launcher and use it.
+rem Remove the [] if you want to set this to something.
+set EXE_NAME=[]
+rem If you use a custom exe the script might not find the process name you can set it manually here
+set Finder=[]
+
 set venv=.\.venv
 rem if using a virtual environment use it
 if exist "%venv%" (
     call %venv%\scripts\activate
 )
-
 REM The executable name and the string to find the process
-if exist Launcher.py (
-    set EXE_NAME=Launcher.py
-    set Finder=py.exe
-) else (
-    set EXE_NAME=ArchipelagoLauncherDebug.exe
-    set Finder=ArchipelagoLauncherDebug
+if %EXE_NAME% EQU [] (
+    if exist Launcher.py (
+        set EXE_NAME=Launcher.py
+    ) else (
+        set EXE_NAME=ArchipelagoLauncherDebug.exe
+    )
 )
 
+if %Finder% EQU [] (
+    if /I [!EXE_NAME:~-3!] EQU [.py] (
+        set Finder=py.exe
+    ) else (
+        set Finder=!EXE_NAME:~0,-4!
+    )
+)
+echo Executable used for generations: !EXE_NAME!
+echo Proccess name used to find still alive generations: !Finder!
+
+set TARGET=3
 set /p TARGET="Enter number of games to generate (default 3): "
 set num_players=1
 echo Enter number of worlds to generate
@@ -89,7 +97,7 @@ if %ERRORLEVEL% EQU 0 (
 rem tasklist /fi "WINDOWTITLE eq APGenerate" "IMAGENAME eq py.exe"
 REM Count how many ArchipelagoGenerate.exe are currently running
 set ProcessCount=0
-for /f "delims=" %%C in ('tasklist /FI "WINDOWTITLE eq %WindowName%" ^| find /I /C "%Finder%"') do (
+for /f "delims=" %%C in ('tasklist /FI "WINDOWTITLE eq %WindowName%" ^| find /I /C "!Finder!"') do (
     set ProcessCount=%%C
 )
 
@@ -99,7 +107,7 @@ if !ProcessCount! LSS %TARGET% (
     echo Currently running: !ProcessCount!. Need !NEEDED! more. At %TIME%.
     for /l %%j in (1,1,!NEEDED!) do (
         echo Starting new %EXE_NAME% process...
-        start "%WindowName%" "%EXE_NAME%" GenerateTweaked -- !skip_fail_prompt! !skip_progbal! --spoiler %spoiler_lvl% --multi %num_players% --outputpath .\%OUTPUT_DIR% --player_files_path .\%PLAYER_DIR% %Extra_Args%
+        start "%WindowName%" "!EXE_NAME!" %Extra_Args% !skip_fail_prompt! !skip_progbal! --spoiler %spoiler_lvl% --multi %num_players% --outputpath .\%OUTPUT_DIR% --player_files_path .\%PLAYER_DIR%
         timeout /t 1 /nobreak >nul
     )
 ) else (
@@ -114,7 +122,7 @@ goto MAIN_LOOP
 rem give time for the process to be killed
 timeout /t 2 /nobreak >nul
 Set KnownProcessCount=0
-for /f "delims=" %%C in ('tasklist /FI "WINDOWTITLE eq %WindowName%" ^| find /I /C "%Finder%"') do (
+for /f "delims=" %%C in ('tasklist /FI "WINDOWTITLE eq %WindowName%" ^| find /I /C "!Finder!"') do (
     set KnownProcessCount=%%C
 )
 
@@ -123,7 +131,7 @@ for /F %%i in ('dir /A:-D /B "%OUTPUT_DIR%\*.zip" 2^>nul ^| find /c /v ""') do s
 
 :End_loop
 set ProcessCount=0
-for /f "delims=" %%C in ('tasklist /FI "WINDOWTITLE eq %WindowName%" ^| find /I /C "%Finder%"') do (
+for /f "delims=" %%C in ('tasklist /FI "WINDOWTITLE eq %WindowName%" ^| find /I /C "!Finder!"') do (
     set ProcessCount=%%C
 )
 
