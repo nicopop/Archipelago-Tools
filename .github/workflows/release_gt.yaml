@@ -23,7 +23,7 @@ jobs:
           echo "CURRENT_DATE=$(date +'%Y%m%d')" >> "$GITHUB_ENV"
           echo "CURRENT_DATE_VERSION=$(date +'%Y%m%d')" >> "$GITHUB_ENV"
       - name: Set expected file basename to env
-        run: echo "BASENAME=generate_tweaked_${{ env.CURRENT_DATE }}" >> "$GITHUB_ENV"
+        run: echo "BASENAME=generate_tweaked" >> "$GITHUB_ENV"
       - name: Format changelog input as multiline string and put into env
         run: |
           echo 'CHANGELOG<<EOF' >> "$GITHUB_ENV"
@@ -34,11 +34,12 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v3
       # TODO find how to change the version string in Generate_Tweaked.py
-      # - name: Change game name and creator name to standard names for Manual releases
-      #   run: |
-      #     tmp=$(mktemp)
-      #     jq '.game = "Stable" | .creator = "${{ env.CURRENT_DATE }}"' src/data/game.json > "$tmp"
-      #     mv "$tmp" src/data/game.json
+      - name: Change game name and creator name to standard names for Manual releases
+        # version = 2025_03_24 # YYYYMMDD
+        run: |
+          tmp=$(mktemp)
+          sed -r 's/version = .*/version = ${{ env.CURRENT_DATE_VERSION }}/' worlds/generate-tweaked/Generate_Tweaked.py > "$tmp"
+          mv "$tmp" worlds/generate-tweaked/Generate_Tweaked.py
       - name: Create apworld file
         # rename src folder, zip it, change extension
         run: |
@@ -58,6 +59,6 @@ jobs:
         with:
           name: "GenerateTweaked - ${{ env.CURRENT_DATE_VERSION }}"
           bodyFile: bodyFile.txt
-          tag: ${{ env.BASENAME }}
+          tag: "GT - ${{ env.CURRENT_DATE_VERSION }}"
           commit: ${{ env.GITHUB_REF }}
           artifacts: "${{ env.BASENAME }}.apworld"
