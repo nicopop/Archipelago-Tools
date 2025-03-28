@@ -59,6 +59,6 @@ jobs:
         with:
           name: "GenerateTweaked - ${{ env.CURRENT_DATE_VERSION }}"
           bodyFile: bodyFile.txt
-          tag: "GT - ${{ env.CURRENT_DATE_VERSION }}"
+          tag: "GT${{ env.CURRENT_DATE_VERSION }}"
           commit: ${{ env.GITHUB_REF }}
           artifacts: "${{ env.BASENAME }}.apworld"
