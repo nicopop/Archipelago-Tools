@@ -33,7 +33,6 @@ jobs:
           echo 'EOF' >> "$GITHUB_ENV"
       - name: Checkout repo
         uses: actions/checkout@v3
-      # TODO find how to change the version string in Generate_Tweaked.py
       - name: Change game name and creator name to standard names for Manual releases
         # version = 2025_03_24 # YYYYMMDD
         run: |
