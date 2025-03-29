@@ -4,10 +4,10 @@ on:
   workflow_dispatch:
     inputs:
       versionsuffix:
-        description: 'Optional version suffix. only 1 digit to keep consistant with default 0'
+        description: 'Optional version suffix. Exactly 2 digit to keep consistant with default 00'
         required: false
-        type: number
-        default: 0
+        type: string
+        default: '00'
       changelog:
         description: 'Changelog'
         required: true
@@ -26,7 +26,7 @@ jobs:
       - name: Set current date to env
         run: |
           echo "CURRENT_DATE=$(date +'%Y%m%d')" >> "$GITHUB_ENV"
-          echo "CURRENT_DATE_VERSION=$(date +'%Y%m%d')${{ github.event.inputs.changelog }}" >> "$GITHUB_ENV"
+          echo "CURRENT_DATE_VERSION=$(date +'%Y%m%d')${{ github.event.inputs.versionsuffix }}" >> "$GITHUB_ENV"
       - name: Set expected file basename to env
         run: echo "BASENAME=generate_tweaked" >> "$GITHUB_ENV"
       - name: Format changelog input as multiline string and put into env

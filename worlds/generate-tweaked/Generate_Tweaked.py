@@ -18,7 +18,7 @@ class GeneratorException(Exception):
         self.step: int = step
 
 def main(args: Namespace):
-    logging.info(f"{display_name} version: {(pretty_version())} (YYYY-MM-DD) started.")
+    logging.info(f"{display_name} version: {(pretty_version())} (YYYY-MM-DD(subversion)) started.")
 #region meta.yaml
     if args.weights_file_path and os.path.exists(args.weights_file_path):
         try:
@@ -213,7 +213,7 @@ def main(args: Namespace):
 
 # region Misc functions
 def pretty_version() -> str:
-    return str(version)[:4] + '-' +str(version)[4:6] + '-' +str(version)[-2:]
+    return str(version)[:4] + '-' +str(version)[4:6] + '-' +str(version)[6:8] + f'({str(version)[8:]})'
 
 def get_choice(option, root, value=None, return_all = False) -> Any:
     if option not in root:
@@ -398,7 +398,7 @@ def mystery_argparse(Args: Tuple|list): # Modified arguments From 0.6.0 Generate
 # endregion
 
 # region Start
-version = 2025_03_24 # YYYYMMDD
+version = 2025_03_29_0 # YYYYMMDDV
 display_name = "GenerateTweaked"
 def start(*args):
     args = mystery_argparse(args)
