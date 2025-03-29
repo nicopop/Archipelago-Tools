@@ -325,7 +325,7 @@ def loadplayers(input_folder_name):
         if name.lower() not in {"meta.yaml", "weight.yaml"}:
             for yaml in yaml_data:
                 player_id = get_choice('name', yaml, 'No description specified')
-                logging.info(f"P {i} ({player_id}) Weights: {filename} >> "
+                logging.info(f"P{i} Weights: {player_id} in {filename} >> "
                              f"{get_choice('description', yaml, 'No description specified')}")
                 player_files[name].append(yaml)
                 i += 1
@@ -337,11 +337,11 @@ def mystery_argparse(Args: Tuple|list): # Modified arguments From 0.6.0 Generate
     from settings import get_settings
     def int_range(min_val: int, max_val: int):
         def int_range_checker(arg):
-            """ Type function for argparse - a float within some predefined bounds """
+            """ Type function for argparse - a int within some predefined bounds """
             try:
                 v = int(arg)
             except ValueError:
-                raise ArgumentTypeError("Must be a floating point number")
+                raise ArgumentTypeError("Must be a int point number")
             if v < min_val or v > max_val:
                 raise ArgumentTypeError("Argument must be < " + str(max_val) + "and > " + str(max_val))
             return v
@@ -403,7 +403,6 @@ display_name = "GenerateTweaked"
 def start(*args):
     args = mystery_argparse(args)
     args.seed = get_seed(args.seed)
-    init_logging(f"{display_name}_{args.seed}", loglevel=args.log_level)
     main(args)
 
 if __name__ == '__main__':
