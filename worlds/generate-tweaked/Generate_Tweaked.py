@@ -1,8 +1,7 @@
 import os, logging, yaml, random, tempfile, shutil, zlib
 from datetime import datetime
 from pathlib import Path
-from Generate import main as GenMain, read_weights_yamls
-from Main import main as ERmain
+from Generate import read_weights_yamls
 from argparse import ArgumentParser, ArgumentTypeError, Namespace
 from BaseClasses import PlandoOptions, get_seed
 from Options import ProgressionBalancing
@@ -193,6 +192,8 @@ def main(args: Namespace):
 
     state = "Generate's Main"
     step = 1
+    from Main import main as ERmain
+    from Generate import main as GenMain
     try:
         ERargs, seed = GenMain(args)
         state = "Main's... Main"
