@@ -41,7 +41,7 @@ def main(args: Namespace):
         except Exception as e:
             raise ValueError("No meta description found for meta.yaml. Unable to verify.") from e
         if args.sameoptions:
-            raise Exception("Cannot mix --sameoptions with --meta")
+            raise ValueError("Cannot mix --sameoptions with --meta")
     else:
         meta_weights = {}
 
@@ -158,13 +158,14 @@ def main(args: Namespace):
                         tmp = open(lockfilepath, "r+")
                         logging.error("Seems like the lock file died ")
                         tmp.close()
-                        raise Exception(f"The lock file got unlocked before being deleted. \nfound here: {lockfilepath}")
+                        raise RuntimeError(f"The lock file got unlocked before being deleted. \nfound here: {lockfilepath}")
                     except IOError:
                         logging.debug("lock file is still locked, good.")
                     time.sleep(interval)
                     waited += interval
                     if waited > 3600: #1 hour
-                        raise Exception("Waited too long for the lock file to get removed, you might have an issue or too many yamls")
+                        raise RuntimeError("Waited too long for the lock file to get removed, you might have an issue or too many yamls")
+                logging.info("The lock file is gone, its now time to start Archipelago's generation")
 
         else: # this process is the first :D
             logging.info(f"No existing Cache folder found, Time to create it at '{yaml_path_dir}'.")
@@ -190,13 +191,13 @@ def main(args: Namespace):
     logging.info("Starting full Generation.")
     logging.info(f"Logs past this are saved in Generate_{args.seed}_{datetime.now().strftime('%Y_%m_%d_%H_%M_%S')}.txt")
 
-    state = "Generate's Main"
+    state = "Generate.py's Main"
     step = 1
     from Main import main as ERmain
     from Generate import main as GenMain
     try:
         ERargs, seed = GenMain(args)
-        state = "Main's... Main"
+        state = "Main.py's Main"
         step = 2
         ERmain(ERargs, seed)
     except Exception as ex:
