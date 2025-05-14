@@ -1,4 +1,4 @@
-import os, logging, yaml, random, tempfile, shutil, zlib
+import os, logging, yaml, random, tempfile, shutil, zlib, time
 from datetime import datetime
 from pathlib import Path
 from Generate import read_weights_yamls
@@ -123,7 +123,7 @@ def main(args: Namespace):
         for file, content in player_cache.items():
             yaml_path = os.path.join(yaml_path_dir, file)
             with open(yaml_path, "w+", encoding="utf-8") as f:
-                yaml.dump_all(content, f, sort_keys=False)
+                yaml.dump_all(content, f, sort_keys=False, allow_unicode=True, encoding=None)
 
 # endregion Dumping yaml
 
@@ -141,7 +141,7 @@ def main(args: Namespace):
             for t in item:
                 c1 = zlib.adler32(bytes(repr(t),'utf-8'), c1)
             checksum=checksum ^ c1
-        timestamped_checksum: str = f"{checksum}-{args.max_prog_balancing}-{datetime.today().strftime('%Y-%m-%d')}"
+        timestamped_checksum: str = f"{datetime.today().strftime('%Y-%m-%d')}-{checksum}"
 
         folder = tempfile.gettempdir()
         yaml_path_dir = os.path.join(folder, f"Ap{display_name}Cache", timestamped_checksum)
@@ -149,17 +149,16 @@ def main(args: Namespace):
         if os.path.exists(yaml_path_dir): #probably wait if not done or use the data already there otherwise.
             logging.info(f"Found an existing Cache folder at '{yaml_path_dir}'.")
             if os.path.exists(lockfilepath):
-                import time
                 interval = 5
                 waited = 0
-                logging.info("Found a lock file, another process is still working on generation.")
+                logging.info("Found a lock file, another process is still working on processing the yamls.")
                 while os.path.exists(lockfilepath):
-                    try:
-                        tmp = open(lockfilepath, "r+")
-                        logging.error("Seems like the lock file died ")
-                        tmp.close()
+                    lock = isFileLocked(lockfilepath)
+                    if lock is None:
+                        continue
+                    elif lock == False:
                         raise RuntimeError(f"The lock file got unlocked before being deleted. \nfound here: {lockfilepath}")
-                    except IOError:
+                    else:
                         logging.debug("lock file is still locked, good.")
                     time.sleep(interval)
                     waited += interval
@@ -170,7 +169,8 @@ def main(args: Namespace):
         else: # this process is the first :D
             logging.info(f"No existing Cache folder found, Time to create it at '{yaml_path_dir}'.")
             os.makedirs(yaml_path_dir, exist_ok=True)
-            FileName = open(lockfilepath,"w+")
+            FileName = open(lockfilepath,"w+", encoding="utf-8")
+            FileName.write(f"This is a lockfile for {timestamped_checksum}.")
             prog_balancing_adjustments()
             dump_yamls_to_folder(yaml_path_dir)
             FileName.close()
@@ -201,13 +201,16 @@ def main(args: Namespace):
         step = 2
         ERmain(ERargs, seed)
     except Exception as ex:
+        if not args.cache_modified_player_yamls:
+            if os.path.exists(yaml_path_dir): # Cleanup Temp folder
+                shutil.rmtree(yaml_path_dir)
         raise GeneratorException(f"Base AP's generation failed in {state} \
                                     \n{type(ex).__name__}: {ex}\
                                     \n\nMore info in the stacktrace before the GeneratorException."
                                     , step) from ex
 
 
-    if not args.keep_folder_on_output:
+    if not args.keep_folder_on_output or not args.cache_modified_player_yamls:
         logging.info("Deleting Cache/temp folder")
         if os.path.exists(yaml_path_dir):
             shutil.rmtree(yaml_path_dir) #if it didn't crash delete the folder
@@ -216,6 +219,34 @@ def main(args: Namespace):
 # region Misc functions
 def pretty_version() -> str:
     return str(version)[:4] + '-' +str(version)[4:6] + '-' +str(version)[6:8] + f'({str(version)[8:]})'
+
+def isFileLocked(filePath): #from https://stackoverflow.com/a/63761161
+    '''
+    Checks to see if a file is locked. Performs three checks
+        1. Checks if the file even exists
+        2. Attempts to open the file for reading. This will determine if the file has a write lock.
+            Write locks occur when the file is being edited or copied to, e.g. a file copy destination
+        3. Attempts to rename the file. If this fails the file is open by some other process for reading. The
+            file can be read, but not written to or deleted.
+    '''
+    if not (os.path.exists(filePath)):
+        return None
+    try:
+        f = open(filePath, 'r')
+        f.close()
+    except IOError:
+        return True
+
+    lockFile = filePath + ".lckchk"
+    if (os.path.exists(lockFile)):
+        os.remove(lockFile)
+    try:
+        os.rename(filePath, lockFile)
+        time.sleep(0.20)
+        os.rename(lockFile, filePath)
+        return False
+    except WindowsError:
+        return True
 
 def get_choice(option, root, value=None, return_all = False) -> Any:
     if option not in root:
@@ -386,9 +417,9 @@ def mystery_argparse(Args: Tuple|list): # Modified arguments From 0.6.0 Generate
     parser.add_argument("--skip_prompt", action="store_true",
                     help="Skips generation stopping with the 'press enter to close' prompt")
     parser.add_argument("--cache_modified_player_yamls", action="store_true",
-                    help="Keep a cache of the modified player yamls. Useful for multi-process generation.")
+                    help="Keep a cache of the modified player yamls. Useful for multi-process generation and for debugging.")
     parser.add_argument("--keep_folder_on_output", action="store_true",
-                    help="Should the temporary/cache folder not be deleted on successful output")
+                    help="Should the cache folder not be deleted on successful output")
 
     args: Namespace = parser.parse_args(Args)
     if not os.path.isabs(args.weights_file_path):
