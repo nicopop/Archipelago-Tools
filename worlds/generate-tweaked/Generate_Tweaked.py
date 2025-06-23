@@ -375,7 +375,7 @@ def loadplayers(input_folder_name):
 # endregion
 
 # region Arguments
-def mystery_argparse(Args: Tuple|list): # Modified arguments From 0.6.0 Generate.py
+def mystery_argparse(Args: Tuple|list): # Modified arguments From 0.6.2 Generate.py
     from settings import get_settings
     def int_range(min_val: int, max_val: int):
         def int_range_checker(arg):
@@ -408,9 +408,6 @@ def mystery_argparse(Args: Tuple|list): # Modified arguments From 0.6.0 Generate
 
     default_loglevel = defaults.loglevel if hasattr(defaults, "loglevel") else settings.server_options.loglevel
     parser.add_argument('--log_level', default=default_loglevel, help='Sets log level')
-    if version_tuple.minor >= 6:
-        parser.add_argument('--log_time', help="Add timestamps to STDOUT",
-                            default=defaults.logtime, action='store_true')
 
     parser.add_argument("--csv_output", action="store_true",
                         help="Output rolled player options to csv (made for async multiworld).")
@@ -429,6 +426,14 @@ def mystery_argparse(Args: Tuple|list): # Modified arguments From 0.6.0 Generate
                     help="Keep a cache of the modified player yamls. Useful for multi-process generation and for debugging.")
     parser.add_argument("--keep_folder_on_output", action="store_true",
                     help="Should the cache folder not be deleted on successful output")
+
+    if version_tuple.minor >= 6:
+        parser.add_argument('--log_time', help="Add timestamps to STDOUT",
+                            default=defaults.logtime, action='store_true')
+        if version_tuple.build >= 2:
+            parser.add_argument("--spoiler_only", action="store_true",
+                                help="Skips generation assertion and multidata, outputting only a spoiler log. "
+                                "Intended for debugging and testing purposes.")
 
     args: Namespace = parser.parse_args(Args)
     if not os.path.isabs(args.weights_file_path):
