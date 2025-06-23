@@ -6,7 +6,7 @@ from argparse import ArgumentParser, ArgumentTypeError, Namespace
 from BaseClasses import PlandoOptions, get_seed
 from Options import ProgressionBalancing
 from typing import Tuple, Any, Dict
-from Utils import version_tuple, init_logging
+from Utils import version_tuple, init_logging, is_kivy_running
 
 class GeneratorException(Exception):
     def __init__(self, message, step: int):
@@ -220,6 +220,15 @@ def main(args: Namespace):
 def pretty_version() -> str:
     return str(version)[:4] + '-' +str(version)[4:6] + '-' +str(version)[6:8] + f'({str(version)[8:]})'
 
+def try_input(msg: str) -> str|None:
+    if not is_kivy:
+        try:
+            feedback = input(msg)
+        except EOFError:
+            feedback = None
+        return feedback
+    return None
+
 def isFileLocked(filePath): #from https://stackoverflow.com/a/63761161
     '''
     Checks to see if a file is locked. Performs three checks
@@ -431,21 +440,15 @@ def mystery_argparse(Args: Tuple|list): # Modified arguments From 0.6.0 Generate
 # endregion
 
 # region Start
-version = 2025_03_29_0 # YYYYMMDDV
+version = 2025_06_22_0 # YYYYMMDDV
 display_name = "GenerateTweaked"
+is_kivy = is_kivy_running()
 def start(*args):
     args = mystery_argparse(args)
     args.seed = get_seed(args.seed)
-    main(args)
+    launcher(args)
 
-if __name__ == '__main__':
-    import sys
-    import atexit
-    args = mystery_argparse(sys.argv[1:])
-    args.seed = get_seed(args.seed)
-    init_logging(f"{display_name}_{args.seed}", loglevel=args.log_level)
-
-    confirmation = atexit.register(input, "Press enter to close.")
+def launcher(args: Namespace):
     skip_prompt = bool(args.skip_prompt)
     exception = False
     try:
@@ -458,7 +461,15 @@ if __name__ == '__main__':
     except Exception as ex:
         exception = True
         logging.exception(ex)
-    finally: # in case of error-free exit should not need confirmation
-        if not exception or skip_prompt:
-            atexit.unregister(confirmation)
+    finally:
+        if exception and not skip_prompt:
+            try_input("Press enter to close.")
+
+if __name__ == '__main__':
+    import sys
+    args = tuple(sys.argv[1:])
+    args = mystery_argparse(args)
+    args.seed = get_seed(args.seed)
+    init_logging(f"{display_name}_{args.seed}", loglevel=args.log_level)
+    launcher(args)
 # endregion
